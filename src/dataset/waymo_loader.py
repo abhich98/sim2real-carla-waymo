@@ -173,36 +173,13 @@ class WaymoLoader:
             logger.warning(f"Cannot build component for tag '{tag}': No valid component class found.")
             return None
 
-    @DeprecationWarning
-    def _get_row_dict(
-        self,
-        tag: str,
-        frame_index: int,
-        camera_idx: int | None = None,
-    ) -> dict[str, Any]:
-        if frame_index < 0:
-            raise ValueError("frame_index must be >= 0")
-
-        component_df = self.read_component(tag)
-        if camera_idx is not None:
-            camera_key = "key.camera_name"
-            if camera_key in component_df.columns:
-                component_df = component_df[component_df[camera_key] == camera_idx]
-
-        rows = component_df.head(frame_index + 1, compute=True)
-        if len(rows) <= frame_index:
-            raise IndexError(
-                f"frame_index={frame_index} out of range for component '{tag}'."
-            )
-        return rows.iloc[frame_index].to_dict()
-
     def _get_matching_row_dict(self, tag: str, filters: dict[str, Any]) -> dict[str, Any]:
         component_df = self.read_component(tag)
         for key, value in filters.items():
             if key in component_df.columns:
                 component_df = component_df[component_df[key] == value]
 
-        rows = component_df.head(1, compute=True)
+        rows = component_df.head(1, compute=True, npartitions=-1)
         if rows.empty:
             raise LookupError(f"No row found for component '{tag}' with filters {filters}.")
         return rows.iloc[0].to_dict()
@@ -293,7 +270,7 @@ class WaymoLoader:
                 continue
 
             pixel_pose = pose_range_image if index == 0 else None
-            pixel_pose = None # TODO: Remove this later
+            # pixel_pose = None # TODO: Remove this later
             print("pixel pose is ", "there" if pixel_pose is not None else "not there")
             points_tensor = v2.convert_range_image_to_point_cloud(
                 range_image=range_image,
