@@ -10,14 +10,7 @@ import dask.dataframe as dd
 import numpy as np
 import tensorflow as tf
 
-try:
-    from waymo_open_dataset import v2
-except Exception as import_error:  # pragma: no cover - runtime environment dependent
-    v2 = None
-    _WAYMO_IMPORT_ERROR = import_error
-else:
-    _WAYMO_IMPORT_ERROR = None
-
+from waymo_open_dataset import v2
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +55,7 @@ class WaymoLoader:
         if v2 is None:
             raise ImportError(
                 "waymo_open_dataset.v2 is required but not available in the current environment."
-            ) from _WAYMO_IMPORT_ERROR
+            )
 
     def _load_component_class(self, tag: str) -> type | None:
         self._require_waymo()
@@ -131,21 +124,17 @@ class WaymoLoader:
             raise FileNotFoundError(f"No component paths found for '{tag}' at {remote_glob}")
         return remote_paths
 
-    def read_component(self, tag: str, use_cache: bool | None = None) -> dd.DataFrame:
+    def read_component(
+        self,
+        tag: str,
+        use_cache: bool | None = None,
+        filters: list[tuple[str, str, Any]] | None = None,
+    ) -> dd.DataFrame:
         paths = self._resolve_component_paths(tag, use_cache=use_cache)
-        return dd.read_parquet(paths)
+        return dd.read_parquet(paths, filters=filters)
 
     def warm_cache(self, components: list[str]) -> dict[str, list[str]]:
         return {component: self._resolve_component_paths(component, use_cache=True) for component in components}
-
-    def load_sequence(self, components: list[str] | None = None) -> dict[str, dd.DataFrame]:
-        component_list = components or [
-            "camera_image",
-            "camera_calibration",
-            "lidar",
-            "lidar_calibration",
-        ]
-        return {component: self.read_component(component) for component in component_list}
 
     def _to_component_dict(self, component: Any) -> dict[str, Any]:
         if isinstance(component, dict):
@@ -174,7 +163,8 @@ class WaymoLoader:
             return None
 
     def _get_matching_row_dict(self, tag: str, filters: dict[str, Any]) -> dict[str, Any]:
-        component_df = self.read_component(tag)
+        parquet_filters = [(key, "==", value) for key, value in filters.items()]
+        component_df = self.read_component(tag, filters=parquet_filters)
         for key, value in filters.items():
             if key in component_df.columns:
                 component_df = component_df[component_df[key] == value]
@@ -341,14 +331,23 @@ class WaymoLoader:
         self,
         frame_index: int,
         return_array: bool = False,
-        lidar_name: str | int = "top",
-        camera_name: str | int | None = "front",
+        lidar_name: str | int | None = "top",
+        camera_name: str | int | None = None,
     ) -> dict[str, Any]:
+
+        assert lidar_name is not None or camera_name is not None, "Either lidar name or camera name must be specified"
+
         output = {
             "frame_index": frame_index,
             "frame_timestamp_micros": self.frame_timestamps_micros[frame_index],
-            "lidar": self.get_lidar(frame_index=frame_index, lidar_name=lidar_name, return_array=return_array)
         }
+
+        if lidar_name is not None:
+            output["lidar"] = self.get_lidar(
+                frame_index=frame_index, 
+                lidar_name=lidar_name, 
+                return_array=return_array
+            )
         if camera_name is not None:
             output["camera"] = self.get_camera(
                 frame_index=frame_index,
@@ -357,3 +356,12 @@ class WaymoLoader:
             )
 
         return output
+
+    @validate_frame_index
+    def load_frame_labels(
+        self,
+        frame_index: int,
+        lidar_name: str | int | None = "top",
+        camera_name: str | int | None = None,
+    ) -> Any:
+        raise NotImplementedError()
