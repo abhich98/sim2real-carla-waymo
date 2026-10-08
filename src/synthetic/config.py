@@ -17,6 +17,7 @@ class SyntheticConfigError(ValueError):
 class CarlaConfig:
     host: str
     port: int
+    traffic_manager_port: int
     timeout_seconds: float
     map_name: str | None
 
@@ -25,6 +26,8 @@ class CarlaConfig:
             raise SyntheticConfigError("carla.host must not be empty")
         if not 1 <= self.port <= 65535:
             raise SyntheticConfigError("carla.port must be between 1 and 65535")
+        if not 1 <= self.traffic_manager_port <= 65535:
+            raise SyntheticConfigError("carla.traffic_manager_port must be between 1 and 65535")
         if self.timeout_seconds <= 0:
             raise SyntheticConfigError("carla.timeout_seconds must be positive")
 
@@ -36,8 +39,10 @@ class GenerationConfig:
     seed: int
     train_fraction: float
     split_unit: str
-    synchronous_mode: bool
     fixed_delta_seconds: float
+    ticks_per_frame: int
+    warmup_ticks_per_scene: int
+    max_scene_attempts: int
 
     def __post_init__(self) -> None:
         if self.num_frames <= 0:
@@ -52,6 +57,12 @@ class GenerationConfig:
             raise SyntheticConfigError("generation.split_unit must be 'scene'")
         if self.fixed_delta_seconds <= 0:
             raise SyntheticConfigError("generation.fixed_delta_seconds must be positive")
+        if self.ticks_per_frame <= 0:
+            raise SyntheticConfigError("generation.ticks_per_frame must be positive")
+        if self.warmup_ticks_per_scene < 0:
+            raise SyntheticConfigError("generation.warmup_ticks_per_scene must be non-negative")
+        if self.max_scene_attempts <= 0:
+            raise SyntheticConfigError("generation.max_scene_attempts must be positive")
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,7 +70,6 @@ class CameraConfig:
     width: int
     height: int
     field_of_view_degrees: float
-    sensor_tick_seconds: float
     mount_x_meters: float
     mount_y_meters: float
     mount_z_meters: float
@@ -70,8 +80,6 @@ class CameraConfig:
             raise SyntheticConfigError("camera.width and camera.height must be positive")
         if not 0 < self.field_of_view_degrees < 180:
             raise SyntheticConfigError("camera.field_of_view_degrees must be between 0 and 180")
-        if self.sensor_tick_seconds < 0:
-            raise SyntheticConfigError("camera.sensor_tick_seconds must be non-negative")
         if self.projection_near_plane_meters <= 0:
             raise SyntheticConfigError("camera.projection_near_plane_meters must be positive")
 
@@ -116,6 +124,8 @@ class RandomizationConfig:
     min_vehicles: int
     max_vehicles: int
     min_vehicle_distance_from_camera_meters: float
+    ego_autopilot: bool
+    background_vehicle_autopilot: bool
 
     def __post_init__(self) -> None:
         if not self.weather_presets or any(not value for value in self.weather_presets):
@@ -129,15 +139,41 @@ class RandomizationConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class OcclusionConfig:
+    pedestrian_semantic_tag: int
+    depth_tolerance_meters: float
+    min_visible_pixels: int
+    min_visible_pixel_fraction: float
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.pedestrian_semantic_tag <= 255:
+            raise SyntheticConfigError("occlusion.pedestrian_semantic_tag must be in [0, 255]")
+        if self.depth_tolerance_meters <= 0:
+            raise SyntheticConfigError("occlusion.depth_tolerance_meters must be positive")
+        if self.min_visible_pixels <= 0:
+            raise SyntheticConfigError("occlusion.min_visible_pixels must be positive")
+        if not 0 < self.min_visible_pixel_fraction <= 1:
+            raise SyntheticConfigError("occlusion.min_visible_pixel_fraction must be in (0, 1]")
+
+
+BOX_SOURCES = frozenset({"segmentation", "projected_3d"})
+
+
+@dataclass(frozen=True, slots=True)
 class LabelConfig:
     format: str
     pedestrian_class_id: int
     pedestrian_class_name: str
     clip_boxes_to_image: bool
+    box_source: str
 
     def __post_init__(self) -> None:
         if self.format != "yolo":
             raise SyntheticConfigError("labels.format must be 'yolo'")
+        if self.box_source not in BOX_SOURCES:
+            raise SyntheticConfigError(
+                f"labels.box_source must be one of {sorted(BOX_SOURCES)}"
+            )
         if self.pedestrian_class_id < 0 or not self.pedestrian_class_name.strip():
             raise SyntheticConfigError("pedestrian label class metadata is invalid")
 
@@ -159,6 +195,7 @@ class SyntheticConfig:
     camera: CameraConfig
     pedestrians: PedestrianConfig
     randomization: RandomizationConfig
+    occlusion: OcclusionConfig
     labels: LabelConfig
     output: OutputConfig
 
@@ -191,6 +228,7 @@ def load_synthetic_config(path: str | Path) -> SyntheticConfig:
             camera=CameraConfig(**_section(data, "camera")),
             pedestrians=PedestrianConfig(**_section(data, "pedestrians")),
             randomization=RandomizationConfig(**_section(data, "randomization")),
+            occlusion=OcclusionConfig(**_section(data, "occlusion")),
             labels=LabelConfig(**_section(data, "labels")),
             output=OutputConfig(
                 root=Path(_section(data, "output")["root"]),

@@ -1,6 +1,7 @@
 carla:
   host: 127.0.0.1
   port: 2000
+  traffic_manager_port: 8000
   timeout_seconds: 30.0
   map_name: null
 
@@ -10,14 +11,19 @@ generation:
   seed: 42
   train_fraction: 0.8
   split_unit: scene
-  synchronous_mode: true
+  # Capture always runs in CARLA synchronous mode so images and labels share a frame.
   fixed_delta_seconds: 0.1
+  # Simulation ticks between saved frames; >1 reduces near-duplicate frames.
+  ticks_per_frame: 1
+  # Ticks discarded after each scene is set up (auto-exposure and walkers settle).
+  warmup_ticks_per_scene: 20
+  # Ego spawn points tried per scene before giving up (e.g. no sidewalk nearby).
+  max_scene_attempts: 10
 
 camera:
   width: 1280
   height: 720
   field_of_view_degrees: 90.0
-  sensor_tick_seconds: 0.0
   mount_x_meters: 1.5
   mount_y_meters: 0.0
   mount_z_meters: 1.7
@@ -47,12 +53,28 @@ randomization:
   min_vehicles: 0
   max_vehicles: 12
   min_vehicle_distance_from_camera_meters: 8.0
+  # Drive the camera vehicle / background traffic with the Traffic Manager.
+  ego_autopilot: false
+  background_vehicle_autopilot: true
+
+occlusion:
+  # CARLA semantic tag for pedestrians: 12 for CARLA >= 0.9.14, 4 for older builds.
+  pedestrian_semantic_tag: 12
+  # Depth slack around a pedestrian's 3D box when matching depth-camera pixels.
+  depth_tolerance_meters: 1.0
+  # A pedestrian is labelled only if this many of its pixels are visible...
+  min_visible_pixels: 30
+  # ...and they cover at least this fraction of its in-image projected box.
+  min_visible_pixel_fraction: 0.1
 
 labels:
   format: yolo
   pedestrian_class_id: 0
   pedestrian_class_name: pedestrian
   clip_boxes_to_image: true
+  # segmentation: tight box around visible pedestrian pixels.
+  # projected_3d: projected 3D bounding box (looser), still occlusion-filtered.
+  box_source: segmentation
 
 output:
   root: data/synthetic/carla_pedestrians
