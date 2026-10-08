@@ -33,6 +33,7 @@ class CarlaCapture:
         self._scene_id = ""
 
     def __enter__(self) -> CarlaCapture:
+        # This is setup this way to delay importing CARLA until the generation is run on a system with the CARLA server available.
         try:
             carla = importlib.import_module("carla")  # pyright: ignore[reportMissingImports]
         except ModuleNotFoundError as exc:

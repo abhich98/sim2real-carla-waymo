@@ -3,24 +3,30 @@ requires = ["uv-build>=0.5.0,<0.11"]
 build-backend = "uv_build"
 
 [project]
-name = "waymo-lidar-transformer"
-version = "0.1.0"
+name = "sim2real-waymo"
+version = "0.2.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "dask>=2026.7.1",
     "fiftyone>=1.22.1",
-    "google>=3.0.0",
     "matplotlib>=3.10.5",
-    "open3d>=0.19.0",
     "Pillow>=10.4.0",
-    "pyarrow>=25.0.0",
     "PyYAML>=6.0.2",
-    "tensorflow>=2.21.0",
 ]
 
 [dependency-groups]
+synthetic_gen = [
+    "carla>=0.9.13",
+]
+
+waymo_eval = [
+    "dask>=2026.7.1",
+    "google>=3.0.0",
+    "pyarrow>=25.0.0",
+    "tensorflow>=2.21.0",
+]
+
 dev = [
     "jupyter>=1.1.1",
     "pytest>=8.3.0",
