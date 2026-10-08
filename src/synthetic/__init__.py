@@ -1,7 +1,7 @@
 """Synthetic-data generation APIs, independent of the Waymo data loader."""
 
 from .config import SyntheticConfig, load_synthetic_config
-from .fiftyone_integration import load_fiftyone_dataset
+from src.dataset.fiftyone_integration import load_fiftyone_dataset
 from .generator import generate_dataset
 from .statistics import collect_dataset_statistics, write_dataset_statistics
 from .validation import validate_dataset

@@ -15,6 +15,7 @@ from .waymo_pedestrian_eval import (
     select_waymo_eval_frames,
 )
 from .waymo_eval_validation import validate_waymo_eval_dataset
+from .fiftyone_integration import launch_fiftyone_app, load_fiftyone_dataset
 
 
 DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "configs" / "waymo_eval.yaml"
@@ -28,9 +29,19 @@ def main(argv: list[str] | None = None) -> int:
     action.add_argument("--plan", action="store_true", help="report deterministic selection counts without writing images")
     action.add_argument("--export", action="store_true", help="export the selected image/label evaluation set")
     action.add_argument("--validate", action="store_true", help="validate an existing exported evaluation set")
+    action.add_argument(
+        "--fiftyone",
+        action="store_true",
+        help="load the exported test split and open the FiftyOne App",
+    )
     args = parser.parse_args(argv)
 
     config = load_waymo_eval_config(args.config)
+    if args.fiftyone:
+        dataset = load_fiftyone_dataset(config.output.root, split="test")
+        print(f"Loaded FiftyOne dataset {dataset.name!r}")
+        launch_fiftyone_app(dataset)
+        return 0
     if args.validate:
         errors = validate_waymo_eval_dataset(config)
         print(json.dumps({"valid": not errors, "errors": errors}, indent=2))

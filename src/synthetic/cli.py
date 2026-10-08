@@ -9,10 +9,10 @@ from pathlib import Path
 import yaml
 
 from .config import load_synthetic_config
-from .fiftyone_integration import load_fiftyone_dataset
 from .generator import generate_dataset
 from .statistics import write_dataset_statistics
 from .validation import validate_dataset
+from src.dataset.fiftyone_integration import launch_fiftyone_app, load_fiftyone_dataset
 
 
 DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "configs" / "carla_synthetic.yaml"
@@ -59,11 +59,9 @@ def main(argv: list[str] | None = None) -> int:
         print(yaml.safe_dump(asdict(statistics), sort_keys=False))
         return 0
     if args.fiftyone:
-        dataset = load_fiftyone_dataset(config, split=args.fiftyone)
+        dataset = load_fiftyone_dataset(config.output.root, split=args.fiftyone)
         print(f"Loaded FiftyOne dataset {dataset.name!r}")
-        import fiftyone as fo
-
-        fo.launch_app(dataset).wait()
+        launch_fiftyone_app(dataset)
         return 0
 
     summary = generate_dataset(config)
