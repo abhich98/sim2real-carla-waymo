@@ -7,6 +7,7 @@ import math
 import queue
 import random
 import importlib
+import logging
 import time
 from typing import Any
 
@@ -20,6 +21,8 @@ from .types import CapturedFrame, PixelBox
 # ---------------------------------------------------------------------------
 # Pure helpers (no CARLA dependency, unit-testable)
 # ---------------------------------------------------------------------------
+
+_LOG = logging.getLogger(__name__)
 
 _DEPTH_FAR_METERS = 1000.0
 _DEPTH_SCALE = 256.0**3 - 1.0
@@ -173,6 +176,19 @@ class _SensorStream:
 
 class _SceneSetupError(RuntimeError):
     """A scene could not be populated at the chosen ego spawn point."""
+
+
+def _is_passenger_car(blueprint: Any) -> bool:
+    """True for ordinary cars; excludes trucks, buses, vans and two-wheelers.
+
+    A roof camera at a fixed mount position would end up inside the cab of a truck or bus
+    (whole image one colour) or float in the air on a bicycle.
+    """
+    if blueprint.has_attribute("base_type"):
+        return blueprint.get_attribute("base_type").as_str().lower() == "car"
+    if blueprint.has_attribute("number_of_wheels"):
+        return blueprint.get_attribute("number_of_wheels").as_int() == 4
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -344,17 +360,20 @@ class CarlaCapture:
     def _populate_scene(self, ego_spawn_point: Any, spawn_points: list[Any]) -> None:
         blueprints = self._world.get_blueprint_library()
         vehicle_blueprints = list(blueprints.filter("vehicle.*"))
-        if not vehicle_blueprints:
-            raise RuntimeError("CARLA blueprint library has no vehicle blueprints")
+        ego_blueprints = [bp for bp in vehicle_blueprints if _is_passenger_car(bp)]
+        if not ego_blueprints:
+            raise RuntimeError("CARLA blueprint library has no passenger-car blueprints")
 
-        ego = self._world.try_spawn_actor(self._rng.choice(vehicle_blueprints), ego_spawn_point)
+        ego = self._world.try_spawn_actor(self._rng.choice(ego_blueprints), ego_spawn_point)
         if ego is None:
             raise _SceneSetupError("ego spawn point is occupied")
         self._scene_actors.append(ego)
         self._attach_sensors(ego, blueprints)
 
-        self._spawn_pedestrians(ego, blueprints)
-        self._spawn_background_vehicles(ego, vehicle_blueprints, spawn_points)
+        # In synchronous mode a freshly spawned actor reports a zero transform until the
+        # next tick, so place everything relative to the spawn point, not ego.get_transform().
+        self._spawn_pedestrians(ego_spawn_point, blueprints)
+        self._spawn_background_vehicles(ego_spawn_point, vehicle_blueprints, spawn_points)
         if self.config.randomization.ego_autopilot:
             ego.set_autopilot(True, self.config.carla.traffic_manager_port)
 
@@ -378,7 +397,7 @@ class CarlaCapture:
             self._sensors[name] = sensor
             self._streams[name] = stream
 
-    def _spawn_pedestrians(self, ego: Any, blueprints: Any) -> None:
+    def _spawn_pedestrians(self, ego_transform: Any, blueprints: Any) -> None:
         pedestrians = self.config.pedestrians
         walker_blueprints = list(blueprints.filter("walker.pedestrian.*"))
         controller_blueprint = blueprints.find("controller.ai.walker")
@@ -388,7 +407,6 @@ class CarlaCapture:
             return
 
         count = self._rng.randint(pedestrians.min_per_scene, pedestrians.max_per_scene)
-        ego_transform = ego.get_transform()
         origin = ego_transform.location
         forward = ego_transform.get_forward_vector()
         attempts = max(count, 1) * pedestrians.spawn_attempts_per_pedestrian
@@ -448,13 +466,14 @@ class CarlaCapture:
             if destination is not None:
                 controller.go_to_location(destination)
             self._walkers.append(walker)
+        _LOG.info("scene %s: %d pedestrians spawned (target %d)", self._scene_id, len(self._walkers), count)
 
     def _spawn_background_vehicles(
-        self, ego: Any, vehicle_blueprints: list[Any], spawn_points: list[Any]
+        self, ego_transform: Any, vehicle_blueprints: list[Any], spawn_points: list[Any]
     ) -> None:
         randomization = self.config.randomization
         count = self._rng.randint(randomization.min_vehicles, randomization.max_vehicles)
-        ego_location = ego.get_location()
+        ego_location = ego_transform.location
         candidates = [
             point
             for point in spawn_points

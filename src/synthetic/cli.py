@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 from dataclasses import asdict
 from pathlib import Path
 
@@ -43,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
         help="load the selected split and open the FiftyOne App",
     )
     args = parser.parse_args(argv)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     config = load_synthetic_config(args.config)
     config_data = asdict(config)
