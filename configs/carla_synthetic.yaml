@@ -1,0 +1,59 @@
+carla:
+  host: 127.0.0.1
+  port: 2000
+  timeout_seconds: 30.0
+  map_name: null
+
+generation:
+  num_frames: 10000
+  frames_per_scene: 100
+  seed: 42
+  train_fraction: 0.8
+  split_unit: scene
+  synchronous_mode: true
+  fixed_delta_seconds: 0.1
+
+camera:
+  width: 1280
+  height: 720
+  field_of_view_degrees: 90.0
+  sensor_tick_seconds: 0.0
+  mount_x_meters: 1.5
+  mount_y_meters: 0.0
+  mount_z_meters: 1.7
+  projection_near_plane_meters: 0.1
+
+pedestrians:
+  min_per_scene: 5
+  max_per_scene: 15
+  min_distance_meters: 5.0
+  max_distance_meters: 45.0
+  min_visible_fraction: 0.25
+  min_box_area_pixels: 16.0
+  front_spawn_cosine: 0.5
+  spawn_attempts_per_pedestrian: 40
+  min_walk_speed_meters_per_second: 0.8
+  max_walk_speed_meters_per_second: 1.8
+
+randomization:
+  weather_presets:
+    - ClearNoon
+    - CloudyNoon
+    - WetCloudySunset
+  time_of_day_hours:
+    - 8
+    - 12
+    - 17
+  min_vehicles: 0
+  max_vehicles: 12
+  min_vehicle_distance_from_camera_meters: 8.0
+
+labels:
+  format: yolo
+  pedestrian_class_id: 0
+  pedestrian_class_name: pedestrian
+  clip_boxes_to_image: true
+
+output:
+  root: data/synthetic/carla_pedestrians
+  image_format: png
