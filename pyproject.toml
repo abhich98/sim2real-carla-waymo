@@ -12,12 +12,13 @@ dependencies = [
     "fiftyone>=1.22.1",
     "matplotlib>=3.10.5",
     "Pillow>=10.4.0",
+    "python-dotenv>=1.0.1",
     "PyYAML>=6.0.2",
 ]
 
 [dependency-groups]
 synthetic_gen = [
-    "carla>=0.9.13",
+    "carla>=0.9.16",
 ]
 
 waymo_eval = [

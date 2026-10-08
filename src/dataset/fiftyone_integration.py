@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
+from dotenv import load_dotenv
+
 
 FiftyOneSplit = Literal["train", "val", "test"]
 
@@ -15,6 +17,7 @@ def load_fiftyone_dataset(
     name: str | None = None,
 ) -> Any:
     """Import a YOLOv5-format split into a temporary FiftyOne dataset."""
+    load_dotenv()
     from fiftyone import Dataset
     from fiftyone.types import YOLOv5Dataset
 
